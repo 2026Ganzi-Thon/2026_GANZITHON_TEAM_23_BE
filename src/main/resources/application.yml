@@ -1,0 +1,20 @@
+spring:
+  application.name: pulse-be
+  datasource:
+    url: jdbc:h2:mem:pulse;MODE=MySQL;DB_CLOSE_DELAY=-1
+    username: sa
+    password:
+  jpa:
+    hibernate.ddl-auto: update
+    open-in-view: false
+  jackson:
+    time-zone: Asia/Seoul
+
+pulse:
+  jwt:
+    secret: ${JWT_SECRET:dev-only-secret-change-me-please-32bytes-minimum!!}
+    expiration-minutes: ${JWT_EXPIRATION_MINUTES:1440}
+  alert:
+    base-threshold: 25
+    dismiss-step: 5
+    max-threshold: 45

@@ -356,12 +356,13 @@ FE는 `code`로 화면 분기를 하고, 알 수 없는 코드는 `message`를 �
   "data": {
     "pictureId": "pic_park_01",
     "mode": "OBJECT",
-    "imageUrl": "https://cdn.example.com/pictures/park_01.jpg",
+    "imageUrl": "https://api.example.com/pictures/park_01.png",
     "aspectRatio": 0.4595,
     "targets": [
-      { "targetId": "cat-tree", "label": "고양이", "emoji": "🐱", "x": 0.136, "y": 0.195, "radius": 0.1 },
-      { "targetId": "cat-rock", "label": "고양이", "emoji": "🐱", "x": 0.588, "y": 0.482, "radius": 0.08 },
-      { "targetId": "cat-picnic", "label": "고양이", "emoji": "🐱", "x": 0.79, "y": 0.843, "radius": 0.13 }
+      { "targetId": "cat-tree", "label": "고양이", "emoji": "🐱", "x": 0.159, "y": 0.174, "radius": 0.088 },
+      { "targetId": "cat-rock", "label": "고양이", "emoji": "🐱", "x": 0.618, "y": 0.520, "radius": 0.065 },
+      { "targetId": "cat-bush", "label": "고양이", "emoji": "🐱", "x": 0.926, "y": 0.711, "radius": 0.076 },
+      { "targetId": "cat-sleep", "label": "고양이", "emoji": "🐱", "x": 0.812, "y": 0.859, "radius": 0.112 }
     ]
   }
 }
@@ -381,6 +382,9 @@ FE는 `code`로 화면 분기를 하고, 알 수 없는 코드는 `message`를 �
 
 - 좌표는 픽셀이 아니라 **비율**이라 기기 화면 크기와 상관없이 같은 위치를 가리킵니다.
 - `radius`는 가로·세로 모두 **이미지 너비**를 기준으로 계산합니다.
+- `targets`의 개수가 진행도 표시(예: "고양이를 찾아보세요 4/4")의 전체 개수입니다. 앱은 대상을 하나 찾을 때마다 숫자를 올리고, 모두 찾으면 "다음 단계로"를 보여줍니다.
+- 같은 `label`(고양이)이 여러 개여도 되고, `targetId`로 구분합니다. 이미 찾은 대상을 다시 눌러도 개수는 늘지 않습니다. (앱 처리)
+- 위 예시는 850×1850 공원 그림(`pic_park_01`)에서 고양이 4마리의 실제 위치입니다. 값은 앱에서 눌러 보며 조정할 수 있습니다.
 
 **Error**
 

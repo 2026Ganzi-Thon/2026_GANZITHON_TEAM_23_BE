@@ -32,6 +32,13 @@ public class User {
     @Column(nullable = false)
     private Instant createdAt = Instant.now();
 
+    /** 보호자는 1명이라 별도 테이블 없이 둔다. 둘 다 null이면 보호자 없음 */
+    @Column(length = 20)
+    private String guardianName;
+
+    @Column(length = 11)
+    private String guardianPhone;
+
     protected User() {}
 
     public User(String name, String nickname, String email, String loginId,
@@ -48,6 +55,23 @@ public class User {
         this.alertThreshold = Math.min(this.alertThreshold + step, max);
     }
 
+    /** null인 인자는 바꾸지 않는다 */
+    public void updateProfile(String name, String nickname, String email) {
+        if (name != null) this.name = name;
+        if (nickname != null) this.nickname = nickname;
+        if (email != null) this.email = email;
+    }
+
+    public void assignGuardian(String name, String phone) {
+        this.guardianName = name;
+        this.guardianPhone = phone;
+    }
+
+    public void clearGuardian() {
+        this.guardianName = null;
+        this.guardianPhone = null;
+    }
+
     public Long getId() { return id; }
     public String getName() { return name; }
     public String getNickname() { return nickname; }
@@ -55,4 +79,6 @@ public class User {
     public String getLoginId() { return loginId; }
     public String getPasswordHash() { return passwordHash; }
     public int getAlertThreshold() { return alertThreshold; }
+    public String getGuardianName() { return guardianName; }
+    public String getGuardianPhone() { return guardianPhone; }
 }

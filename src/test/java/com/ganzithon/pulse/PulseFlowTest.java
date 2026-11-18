@@ -328,6 +328,231 @@ class PulseFlowTest {
         assertEquals("alertId", alert.at("/errors/0/field").asText());
     }
 
+    // ---------- 마이페이지·보호자 ----------
+
+    private static final String ME = "/api/v1/users/me";
+    private static final String GUARDIAN = "/api/v1/users/me/guardian";
+
+    /** PATCH·PUT·DELETE·GET을 같은 방식으로 부르고 응답 본문을 JSON으로 돌려준다 */
+    private JsonNode send(MockHttpServletRequestBuilder req, String body, String token, int status) throws Exception {
+        if (body != null) req.contentType(MediaType.APPLICATION_JSON).content(body);
+        if (token != null) req.header("Authorization", "Bearer " + token);
+        return om.readTree(mvc.perform(req).andExpect(status().is(status)).andReturn().getResponse().getContentAsString());
+    }
+
+    private JsonNode me(String token) throws Exception {
+        return send(get(ME), null, token, 200);
+    }
+
+    private static String fieldNames(JsonNode node) {
+        java.util.List<String> names = new java.util.ArrayList<>();
+        node.fieldNames().forEachRemaining(names::add);
+        return names.toString();
+    }
+
+    private static boolean hasErrorField(JsonNode res, String field) {
+        for (JsonNode e : res.get("errors")) {
+            if (field.equals(e.get("field").asText())) return true;
+        }
+        return false;
+    }
+
+    @Test
+    void meReturnsProfileWithNullGuardian() throws Exception {
+        String token = signupToken("me01");
+        JsonNode res = me(token);
+        assertTrue(res.get("success").asBoolean());
+        JsonNode data = res.get("data");
+        // 필드 이름과 순서는 명세 7.1 예시와 같다. 보호자가 없어도 guardian 키는 있다
+        assertEquals("[userId, name, nickname, email, loginId, guardian]",
+                fieldNames(data));
+        assertEquals("홍길동", data.get("name").asText());
+        assertEquals("길동", data.get("nickname").asText());
+        assertEquals("hello@example.com", data.get("email").asText());
+        assertEquals("me01", data.get("loginId").asText());
+        assertTrue(data.has("guardian"));
+        assertTrue(data.get("guardian").isNull());
+    }
+
+    @Test
+    void patchMeChangesOnlySentFields() throws Exception {
+        String token = signupToken("mepatch01");
+
+        JsonNode nick = send(patch(ME), "{\"nickname\":\"새닉네임\"}", token, 200).get("data");
+        assertEquals("새닉네임", nick.get("nickname").asText());
+        assertEquals("홍길동", nick.get("name").asText());
+        assertEquals("hello@example.com", nick.get("email").asText());
+        assertTrue(nick.get("guardian").isNull());
+
+        // 앞뒤 공백은 지우고 저장한다. null로 보낸 필드는 바꾸지 않는다
+        JsonNode name = send(patch(ME), "{\"name\":\" 홍길순 \",\"nickname\":null}", token, 200).get("data");
+        assertEquals("홍길순", name.get("name").asText());
+        assertEquals("새닉네임", name.get("nickname").asText());
+        assertEquals("홍길순", me(token).at("/data/name").asText());
+
+        JsonNode email = send(patch(ME), "{\"email\":\"new@example.com\"}", token, 200).get("data");
+        assertEquals("new@example.com", email.get("email").asText());
+    }
+
+    @Test
+    void patchMeIgnoresLoginIdAndPassword() throws Exception {
+        String token = signupToken("mepatch02");
+        JsonNode res = send(patch(ME), "{\"nickname\":\"새닉\",\"loginId\":\"other01\",\"password\":\"newpassword1\"}",
+                token, 200).get("data");
+        assertEquals("새닉", res.get("nickname").asText());
+        assertEquals("mepatch02", res.get("loginId").asText());
+        assertEquals("mepatch02", me(token).at("/data/loginId").asText());
+        call("/api/v1/auth/login", "{\"loginId\":\"mepatch02\",\"password\":\"password123\"}", null, 200);
+    }
+
+    @Test
+    void patchMeRejectsEmptyRequest() throws Exception {
+        String token = signupToken("mepatch03");
+        for (String body : new String[] {"{}", "{\"loginId\":\"other01\"}", "{\"name\":null,\"nickname\":null,\"email\":null}"}) {
+            JsonNode res = send(patch(ME), body, token, 400);
+            assertEquals("COMMON-001", res.get("code").asText());
+            assertEquals("바꿀 항목을 하나 이상 보내 주세요.", res.at("/errors/0/reason").asText());
+        }
+        assertEquals("길동", me(token).at("/data/nickname").asText());
+    }
+
+    @Test
+    void patchMeValidatesFieldsAndChangesNothingOnFailure() throws Exception {
+        String token = signupToken("mepatch04");
+
+        JsonNode blank = send(patch(ME), "{\"nickname\":\"   \"}", token, 400);
+        assertEquals("COMMON-001", blank.get("code").asText());
+        assertTrue(hasErrorField(blank, "nickname"));
+
+        // 일부 필드만 틀려도 맞는 필드까지 바뀌지 않는다
+        JsonNode partial = send(patch(ME), "{\"name\":\"새이름\",\"email\":\"hello@\"}", token, 400);
+        assertEquals("COMMON-001", partial.get("code").asText());
+        assertTrue(hasErrorField(partial, "email"));
+        assertEquals("홍길동", me(token).at("/data/name").asText());
+
+        assertTrue(hasErrorField(send(patch(ME), "{\"name\":\"" + "가".repeat(21) + "\"}", token, 400), "name"));
+        assertTrue(hasErrorField(send(patch(ME), "{\"nickname\":\"" + "가".repeat(11) + "\"}", token, 400), "nickname"));
+        assertTrue(hasErrorField(send(patch(ME), "{\"email\":\"\"}", token, 400), "email"));
+        assertTrue(hasErrorField(send(patch(ME), "{\"email\":\"" + "a".repeat(250) + "@x.com\"}", token, 400), "email"));
+        assertEquals("홍길동", me(token).at("/data/name").asText());
+    }
+
+    @Test
+    void mypageRequiresTokenAndExistingUser() throws Exception {
+        for (MockHttpServletRequestBuilder req : new MockHttpServletRequestBuilder[] {
+                get(ME), patch(ME), put(GUARDIAN), delete(GUARDIAN)}) {
+            JsonNode res = send(req, null, null, 401);
+            assertEquals("AUTH-003", res.get("code").asText());
+        }
+
+        // 토큰은 유효한데 사용자가 없는 경우 (서버 재시작으로 메모리 DB가 비워진 상황)
+        String token = signupToken("megone01");
+        userRepository.delete(userRepository.findByLoginId("megone01").orElseThrow());
+        assertEquals("AUTH-003", send(get(ME), null, token, 401).get("code").asText());
+        assertEquals("AUTH-003", send(patch(ME), "{\"nickname\":\"새닉\"}", token, 401).get("code").asText());
+        assertEquals("AUTH-003", send(put(GUARDIAN), "{\"name\":\"엄마\",\"phone\":\"01012345678\"}", token, 401)
+                .get("code").asText());
+        assertEquals("AUTH-003", send(delete(GUARDIAN), null, token, 401).get("code").asText());
+    }
+
+    @Test
+    void guardianIsRegisteredAndOverwritten() throws Exception {
+        String token = signupToken("guard01");
+
+        JsonNode saved = send(put(GUARDIAN), "{\"name\":\" 엄마 \",\"phone\":\"010-1234-5678\"}", token, 200);
+        assertTrue(saved.get("success").asBoolean());
+        assertEquals("엄마", saved.at("/data/name").asText());
+        assertEquals("01012345678", saved.at("/data/phone").asText());
+        assertEquals("[name, phone]", fieldNames(saved.get("data")));
+
+        JsonNode guardian = me(token).at("/data/guardian");
+        assertEquals("엄마", guardian.get("name").asText());
+        assertEquals("01012345678", guardian.get("phone").asText());
+
+        // 다시 등록하면 덮어쓴다 (보호자는 1명)
+        send(put(GUARDIAN), "{\"name\":\"아빠\",\"phone\":\"01098765432\"}", token, 200);
+        JsonNode second = me(token).at("/data/guardian");
+        assertEquals("아빠", second.get("name").asText());
+        assertEquals("01098765432", second.get("phone").asText());
+        assertEquals(2, second.size());
+    }
+
+    @Test
+    void guardianPhoneKeepsDigitsOnly() throws Exception {
+        String token = signupToken("guard02");
+        assertEquals("01012345678", send(put(GUARDIAN), "{\"name\":\"엄마\",\"phone\":\"010 1234 5678\"}", token, 200)
+                .at("/data/phone").asText());
+        assertEquals("0111234567", send(put(GUARDIAN), "{\"name\":\"엄마\",\"phone\":\"011-123-4567\"}", token, 200)
+                .at("/data/phone").asText());
+
+        for (String phone : new String[] {"02-123-4567", "+82 10-1234-5678", "010-123", "010-1234-56789", ""}) {
+            JsonNode bad = send(put(GUARDIAN), "{\"name\":\"엄마\",\"phone\":\"" + phone + "\"}", token, 400);
+            assertEquals("COMMON-001", bad.get("code").asText(), phone);
+            assertTrue(hasErrorField(bad, "phone"), phone);
+        }
+        JsonNode missing = send(put(GUARDIAN), "{\"name\":\"엄마\"}", token, 400);
+        assertTrue(hasErrorField(missing, "phone"));
+        // 실패한 요청은 저장된 번호를 바꾸지 않는다
+        assertEquals("0111234567", me(token).at("/data/guardian/phone").asText());
+    }
+
+    @Test
+    void guardianNameIsValidatedAndFailureKeepsExisting() throws Exception {
+        String token = signupToken("guard03");
+        send(put(GUARDIAN), "{\"name\":\"엄마\",\"phone\":\"01012345678\"}", token, 200);
+
+        JsonNode missing = send(put(GUARDIAN), "{\"phone\":\"01012345678\"}", token, 400);
+        assertEquals("COMMON-001", missing.get("code").asText());
+        assertTrue(hasErrorField(missing, "name"));
+        assertTrue(hasErrorField(send(put(GUARDIAN), "{\"name\":\"   \",\"phone\":\"01012345678\"}", token, 400), "name"));
+        JsonNode tooLong = send(put(GUARDIAN), "{\"name\":\"" + "가".repeat(21) + "\",\"phone\":\"01012345678\"}", token, 400);
+        assertEquals("COMMON-001", tooLong.get("code").asText());
+        assertTrue(hasErrorField(tooLong, "name"));
+        send(put(GUARDIAN), "{\"name\":\"" + "가".repeat(20) + "\",\"phone\":\"01012345678\"}", token, 200);
+
+        send(put(GUARDIAN), "{\"name\":\"엄마\",\"phone\":\"01012345678\"}", token, 200);
+        send(put(GUARDIAN), "{\"name\":\"\",\"phone\":\"01012345678\"}", token, 400);
+        assertEquals("엄마", me(token).at("/data/guardian/name").asText());
+    }
+
+    @Test
+    void guardianDeleteIsIdempotent() throws Exception {
+        String token = signupToken("guard04");
+        send(put(GUARDIAN), "{\"name\":\"엄마\",\"phone\":\"01012345678\"}", token, 200);
+
+        JsonNode deleted = send(delete(GUARDIAN), null, token, 200);
+        assertTrue(deleted.get("success").asBoolean());
+        assertEquals("처리되었습니다.", deleted.get("message").asText());
+        assertTrue(me(token).at("/data").has("guardian"));
+        assertTrue(me(token).at("/data/guardian").isNull());
+
+        // 보호자가 없어도 200
+        assertEquals("처리되었습니다.", send(delete(GUARDIAN), null, token, 200).get("message").asText());
+
+        // 지운 뒤 다시 등록할 수 있다
+        send(put(GUARDIAN), "{\"name\":\"아빠\",\"phone\":\"01098765432\"}", token, 200);
+        assertEquals("아빠", me(token).at("/data/guardian/name").asText());
+    }
+
+    @Test
+    void guardianIsPerUser() throws Exception {
+        String a = signupToken("guard05");
+        String b = signupToken("guard06");
+        send(put(GUARDIAN), "{\"name\":\"엄마\",\"phone\":\"01012345678\"}", a, 200);
+        assertTrue(me(b).at("/data/guardian").isNull());
+        send(delete(GUARDIAN), null, b, 200);
+        assertEquals("엄마", me(a).at("/data/guardian/name").asText());
+    }
+
+    @Test
+    void corsPreflightAllowsPatchOnMe() throws Exception {
+        mvc.perform(options(ME)
+                        .header("Origin", "http://localhost:3000")
+                        .header("Access-Control-Request-Method", "PATCH"))
+                .andExpect(status().isOk())
+                .andExpect(header().string("Access-Control-Allow-Methods", org.hamcrest.Matchers.containsString("PATCH")));
+    }
+
     // ---------- 공통 ----------
 
     @Test

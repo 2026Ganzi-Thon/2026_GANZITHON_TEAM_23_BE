@@ -1,4 +1,4 @@
-package com.ganzithon.pulse.auth;
+package com.ganzithon.pulse.global.auth;
 
 import com.ganzithon.pulse.global.exception.BusinessException;
 import com.ganzithon.pulse.global.exception.ErrorCode;

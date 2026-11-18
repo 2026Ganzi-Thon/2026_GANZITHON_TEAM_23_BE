@@ -1,8 +1,10 @@
-package com.ganzithon.pulse.alert;
+package com.ganzithon.pulse.controller;
 
-import com.ganzithon.pulse.alert.AlertDtos.*;
-import com.ganzithon.pulse.auth.AuthInterceptor;
+import com.ganzithon.pulse.dto.alert.SpikeRequest;
+import com.ganzithon.pulse.dto.alert.SpikeResponse;
+import com.ganzithon.pulse.global.auth.AuthInterceptor;
 import com.ganzithon.pulse.global.response.ApiResponse;
+import com.ganzithon.pulse.service.AlertService;
 import jakarta.validation.Valid;
 import org.springframework.web.bind.annotation.*;
 

@@ -1,5 +1,6 @@
-package com.ganzithon.pulse.user;
+package com.ganzithon.pulse.repository;
 
+import com.ganzithon.pulse.entity.User;
 import java.util.Optional;
 import org.springframework.data.jpa.repository.JpaRepository;
 

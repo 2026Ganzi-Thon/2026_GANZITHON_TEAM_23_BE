@@ -1,7 +1,10 @@
-package com.ganzithon.pulse.auth;
+package com.ganzithon.pulse.controller;
 
-import com.ganzithon.pulse.auth.AuthDtos.*;
+import com.ganzithon.pulse.dto.auth.AuthResponse;
+import com.ganzithon.pulse.dto.auth.LoginRequest;
+import com.ganzithon.pulse.dto.auth.SignupRequest;
 import com.ganzithon.pulse.global.response.ApiResponse;
+import com.ganzithon.pulse.service.AuthService;
 import jakarta.validation.Valid;
 import org.springframework.http.HttpStatus;
 import org.springframework.web.bind.annotation.*;

@@ -1,4 +1,4 @@
-package com.ganzithon.pulse.user;
+package com.ganzithon.pulse.entity;
 
 import jakarta.persistence.*;
 import java.time.Instant;

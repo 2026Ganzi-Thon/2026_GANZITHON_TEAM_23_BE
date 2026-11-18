@@ -1,11 +1,14 @@
-package com.ganzithon.pulse.alert;
+package com.ganzithon.pulse.service;
 
-import com.ganzithon.pulse.alert.AlertDtos.*;
+import com.ganzithon.pulse.dto.alert.SpikeRequest;
+import com.ganzithon.pulse.dto.alert.SpikeResponse;
+import com.ganzithon.pulse.entity.Alert;
+import com.ganzithon.pulse.entity.User;
 import com.ganzithon.pulse.global.exception.BusinessException;
 import com.ganzithon.pulse.global.exception.ErrorCode;
 import com.ganzithon.pulse.global.util.TimeFormat;
-import com.ganzithon.pulse.user.User;
-import com.ganzithon.pulse.user.UserRepository;
+import com.ganzithon.pulse.repository.AlertRepository;
+import com.ganzithon.pulse.repository.UserRepository;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;

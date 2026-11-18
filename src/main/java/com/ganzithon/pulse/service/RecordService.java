@@ -1,6 +1,9 @@
-package com.ganzithon.pulse.record;
+package com.ganzithon.pulse.service;
 
-import com.ganzithon.pulse.record.RecordDtos.*;
+import com.ganzithon.pulse.dto.record.RecordRequest;
+import com.ganzithon.pulse.dto.record.RecordResponse;
+import com.ganzithon.pulse.entity.ActivityRecord;
+import com.ganzithon.pulse.repository.RecordRepository;
 import java.util.List;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;

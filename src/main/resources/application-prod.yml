@@ -4,4 +4,9 @@ spring:
     username: ${DB_USERNAME}
     password: ${DB_PASSWORD}
   jpa:
-    hibernate.ddl-auto: update
+    hibernate.ddl-auto: update # 운영 DB 데이터는 재시작해도 유지
+  h2.console.enabled: false # 운영에서는 DB 콘솔을 열지 않는다
+
+pulse:
+  jwt:
+    secret: ${JWT_SECRET} # 기본값 없음: 환경변수가 없으면 기동 실패 (개발용 시크릿 사용 방지)

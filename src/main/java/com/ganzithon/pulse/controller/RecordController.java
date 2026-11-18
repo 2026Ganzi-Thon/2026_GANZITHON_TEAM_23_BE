@@ -1,8 +1,10 @@
-package com.ganzithon.pulse.record;
+package com.ganzithon.pulse.controller;
 
-import com.ganzithon.pulse.auth.AuthInterceptor;
+import com.ganzithon.pulse.dto.record.RecordRequest;
+import com.ganzithon.pulse.dto.record.RecordResponse;
+import com.ganzithon.pulse.global.auth.AuthInterceptor;
 import com.ganzithon.pulse.global.response.ApiResponse;
-import com.ganzithon.pulse.record.RecordDtos.*;
+import com.ganzithon.pulse.service.RecordService;
 import jakarta.validation.Valid;
 import java.util.List;
 import org.springframework.http.HttpStatus;

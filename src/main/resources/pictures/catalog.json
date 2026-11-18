@@ -2,13 +2,97 @@
   {
     "pictureId": "pic_park_01",
     "mode": "OBJECT",
-    "image": "park_01.png",
+    "image": "park_01.jpg",
     "aspectRatio": 0.4595,
     "targets": [
-      { "targetId": "cat-tree", "label": "고양이", "emoji": "🐱", "x": 0.159, "y": 0.174, "radius": 0.088 },
-      { "targetId": "cat-rock", "label": "고양이", "emoji": "🐱", "x": 0.618, "y": 0.520, "radius": 0.065 },
-      { "targetId": "cat-bush", "label": "고양이", "emoji": "🐱", "x": 0.926, "y": 0.711, "radius": 0.076 },
-      { "targetId": "cat-sleep", "label": "고양이", "emoji": "🐱", "x": 0.812, "y": 0.859, "radius": 0.112 }
+      {
+        "targetId": "cat-tree",
+        "label": "고양이",
+        "emoji": "🐱",
+        "x": 0.139,
+        "y": 0.195,
+        "radius": 0.1
+      },
+      {
+        "targetId": "cat-pond",
+        "label": "고양이",
+        "emoji": "🐱",
+        "x": 0.6,
+        "y": 0.495,
+        "radius": 0.07
+      },
+      {
+        "targetId": "cat-picnic",
+        "label": "고양이",
+        "emoji": "🐱",
+        "x": 0.833,
+        "y": 0.843,
+        "radius": 0.12
+      }
+    ]
+  },
+  {
+    "pictureId": "pic_park_02",
+    "mode": "OBJECT",
+    "image": "park_02.jpg",
+    "aspectRatio": 0.6667,
+    "targets": [
+      {
+        "targetId": "cat-tree",
+        "label": "고양이",
+        "emoji": "🐱",
+        "x": 0.174,
+        "y": 0.174,
+        "radius": 0.075
+      }
+    ]
+  },
+  {
+    "pictureId": "pic_street_01",
+    "mode": "OBJECT",
+    "image": "street_01.jpg",
+    "aspectRatio": 0.6667,
+    "targets": [
+      {
+        "targetId": "cat-balcony",
+        "label": "고양이",
+        "emoji": "🐱",
+        "x": 0.257,
+        "y": 0.184,
+        "radius": 0.07
+      },
+      {
+        "targetId": "cat-cafe",
+        "label": "고양이",
+        "emoji": "🐱",
+        "x": 0.103,
+        "y": 0.387,
+        "radius": 0.05
+      },
+      {
+        "targetId": "cat-board",
+        "label": "고양이",
+        "emoji": "🐱",
+        "x": 0.481,
+        "y": 0.555,
+        "radius": 0.05
+      },
+      {
+        "targetId": "cat-bench",
+        "label": "고양이",
+        "emoji": "🐱",
+        "x": 0.931,
+        "y": 0.588,
+        "radius": 0.05
+      },
+      {
+        "targetId": "cat-sleep",
+        "label": "고양이",
+        "emoji": "🐱",
+        "x": 0.771,
+        "y": 0.908,
+        "radius": 0.09
+      }
     ]
   }
 ]

@@ -10,3 +10,4 @@ spring:
 pulse:
   jwt:
     secret: ${JWT_SECRET} # 기본값 없음: 환경변수가 없으면 기동 실패 (개발용 시크릿 사용 방지)
+  public-base-url: ${PULSE_PUBLIC_BASE_URL} # 기본값 없음: 없으면 기동 실패 (프록시 뒤에서 Host 헤더가 imageUrl에 들어가 http 주소가 나가는 것을 막는다)

@@ -1,0 +1,14 @@
+[
+  {
+    "pictureId": "pic_park_01",
+    "mode": "OBJECT",
+    "image": "park_01.png",
+    "aspectRatio": 0.4595,
+    "targets": [
+      { "targetId": "cat-tree", "label": "고양이", "emoji": "🐱", "x": 0.159, "y": 0.174, "radius": 0.088 },
+      { "targetId": "cat-rock", "label": "고양이", "emoji": "🐱", "x": 0.618, "y": 0.520, "radius": 0.065 },
+      { "targetId": "cat-bush", "label": "고양이", "emoji": "🐱", "x": 0.926, "y": 0.711, "radius": 0.076 },
+      { "targetId": "cat-sleep", "label": "고양이", "emoji": "🐱", "x": 0.812, "y": 0.859, "radius": 0.112 }
+    ]
+  }
+]

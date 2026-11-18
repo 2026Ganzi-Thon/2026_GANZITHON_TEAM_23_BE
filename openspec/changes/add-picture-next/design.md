@@ -70,7 +70,7 @@
 - 검사는 `static void validate(List<Picture>)`로 둔다. 규칙은 `hidden-picture` 스펙의 "그림 데이터 검증"과 같다. `mode` 값이 enum에 없으면 JSON을 읽는 단계에서 실패한다.
 - 규칙을 어기면 `IllegalStateException`을 던진다. 메시지에는 `pictureId`, 해당하면 `targetId`, 어긴 규칙을 적는다(예: `pic_park_01 / cat-tree: x는 0~1이어야 합니다 (1.2)`). 예외가 빈 생성 중에 나므로 애플리케이션이 기동하지 않고, `./gradlew test`도 컨텍스트 로딩에서 실패한다. 그래서 잘못된 데이터가 배포 전에 걸린다.
 - 읽은 결과는 `Map<Mode, List<Picture>>`로 바꿔 변경할 수 없게 보관한다.
-- 대상 좌표에 대한 기본 검사(대상 1개 이상, `x`·`y`·`radius` 0~1, `targetId` 고유)에 더해 `pictureId` 전체 고유와 `aspectRatio` 0 초과도 검사한다. 앞의 것은 6.2 기록의 `pictureId`가 어느 그림인지 모호해지는 것을 막고, 뒤의 것은 앱의 화면 비율 계산이 깨지는 것을 막는다.
+- 검사 규칙: `pictureId` 비어 있지 않고 전체에서 고유, `mode` 있음, `image` 비어 있지 않음, `aspectRatio` 0 초과, `targets` 1개 이상, 대상마다 `targetId` 비어 있지 않고 그림 안에서 고유, `x`·`y` 0 이상 1 이하, `radius` 0 초과 1 이하, `label`·`emoji` 비어 있지 않음. `radius`는 0을 허용하지 않는다. Jackson은 JSON에서 빠진 `double` 키를 0.0으로 채우므로, 0을 허용하면 `radius` 키를 빠뜨려도 기동이 성공하기 때문이다. `label`·`emoji`는 응답에 그대로 나가는 필수 필드라 빈 문자열을 막는다. 앞의 대상 좌표 검사에 더해 `pictureId` 전체 고유와 `aspectRatio` 0 초과도 검사한다. 앞의 것은 6.2 기록의 `pictureId`가 어느 그림인지 모호해지는 것을 막고, 뒤의 것은 앱의 화면 비율 계산이 깨지는 것을 막는다.
 - 검토한 대안: 요청을 받을 때마다 검사. 잘못된 데이터를 사용자가 먼저 만나게 되므로 고르지 않았다.
 
 ### 5. 그림 선택은 `service/PictureService`가 무작위로 한다
@@ -83,7 +83,7 @@
 
 `PublicUrlResolver`(`@Component`)는 설정 `pulse.public-base-url`을 읽는다. 값이 있으면 끝의 `/`를 지우고 `/pictures/{image}`를 붙인다. 값이 없으면 `ServletUriComponentsBuilder.fromCurrentContextPath()`로 요청을 받은 서버의 스킴, 호스트, 포트를 쓴다. `application.yml`에는 `pulse.public-base-url: ${PULSE_PUBLIC_BASE_URL:}`을 추가한다.
 
-- 리버스 프록시 뒤에 배포하면 요청 기준 주소가 내부 주소(예: `http://localhost:8080`)가 될 수 있다. 그때는 운영 환경에 `PULSE_PUBLIC_BASE_URL`을 넣는다.
+- 리버스 프록시 뒤에 배포하면 요청 기준 주소가 내부 주소나 `http://` 주소가 될 수 있다. 그래서 `prod` 프로필은 `PULSE_PUBLIC_BASE_URL`을 필수로 두고(`application-prod.yml`, 기본값 없음, `JWT_SECRET`과 같은 방식), 기본 프로필(로컬·테스트)만 요청 주소를 쓴다.
 - 검토한 대안: `server.forward-headers-strategy=framework`로 프록시의 `X-Forwarded-*` 헤더를 믿기. 배포 환경과 프록시 설정이 정해지지 않아(`docs/개발현황.md` 3.2) 지금은 고르지 않았다. 나중에 함께 쓸 수 있다.
 - 검토한 대안: `/pictures/park_01.png` 같은 상대 경로. 명세 5.1의 `imageUrl`은 URL이고, React Native의 `Image`는 절대 URL이 필요하므로 고르지 않았다.
 
@@ -111,8 +111,10 @@
 | 추가 | `src/main/resources/pictures/catalog.json` | 결정 2의 초기 데이터 |
 | 추가 | `src/main/resources/static/pictures/` | 확정된 이미지 파일 |
 | 변경 | `src/main/resources/application.yml` | `pulse.public-base-url: ${PULSE_PUBLIC_BASE_URL:}` |
+| 변경 | `src/main/resources/application-prod.yml` | `pulse.public-base-url: ${PULSE_PUBLIC_BASE_URL}` (기본값 없음) |
 | 추가 | `src/test/java/com/ganzithon/pulse/repository/PictureCatalogTest` | 검사 규칙 단위 테스트(Spring 없이) |
 | 추가 | `src/test/java/com/ganzithon/pulse/service/PictureServiceTest` | 그림 없음(`PICTURE_001`), 모드 필터, 기준 주소 설정 단위 테스트 |
+| 추가 | `src/test/java/com/ganzithon/pulse/controller/PictureControllerTest` | 빈 카탈로그에서 404 `PICTURE-001` HTTP 응답(Spring 컨텍스트 없이 standalone MockMvc) |
 | 변경 | `src/test/java/com/ganzithon/pulse/PulseFlowTest` | API 통합 테스트 |
 | 추가 | `src/test/resources/static/pictures/` | 정적 경로 확인용 작은 테스트 파일 |
 
@@ -121,14 +123,14 @@
 - [이미지 파일이 오기 전에는 `imageUrl`이 404를 받는다.] → 미결 사항 1이 정해질 때까지 프론트는 앱 안의 더미 이미지를 함께 쓴다. API 연동(좌표, 개수, 기록 저장의 `pictureId`)은 먼저 확인할 수 있다.
 - [확정 전에는 색 모드 그림이 없어 `mode=COLOR`가 `PICTURE-001`을 받고, "다른 모드" 흐름이 막힌다.] → 프론트는 명세대로 "그림을 불러오지 못했어요."와 다시 불러오기를 보여 준다. 미결 사항 3이 정해지면 카탈로그에 색 모드 그림을 넣는다.
 - [좌표가 실제 이미지와 맞지 않을 수 있다. 명세 예시는 850×1850 기준이지만 Figma 장면 프레임은 402×802(비율 약 0.501)이고, `docs/화면흐름.md`에 따르면 Figma에서 눈으로 잰 y값은 예시보다 0.03~0.09 낮다.] → 좌표는 확정된 이미지 파일 위에서 다시 잰다. 프론트는 이미지를 `aspectRatio`대로 자르지 않고 그려야 비율 좌표가 맞는다. 이 표시 방식을 프론트와 맞춘다.
-- [운영을 프록시 뒤에 두고 `PULSE_PUBLIC_BASE_URL`을 넣지 않으면 앱이 내부 주소를 받는다.] → 배포 체크리스트에 환경변수를 넣는다.
+- [운영을 프록시 뒤에 두고 `PULSE_PUBLIC_BASE_URL`을 빠뜨리면 `Host` 헤더가 그대로 `imageUrl`에 들어가 `http://` 주소가 나가고 iOS가 이미지를 막는다.] → `application-prod.yml`이 `pulse.public-base-url: ${PULSE_PUBLIC_BASE_URL}`을 기본값 없이 요구해, `prod`에서 변수가 없으면 서버가 기동하지 않는다. 기본 프로필은 그대로 빈 값을 허용한다.
 - [카탈로그 오류는 서버 기동 자체를 막는다.] → 의도한 동작이다. `./gradlew test`가 실제 카탈로그로 컨텍스트를 띄우므로 배포 전에 걸린다.
 - [`/pictures/**`는 로그인 없이 누구나 받을 수 있다.] → 일러스트라 공개해도 된다.
 
 ## Migration Plan
 
 - DB 변경이 없다.
-- 운영: 프록시 뒤에 배포하면 `PULSE_PUBLIC_BASE_URL`을 설정한다.
+- 운영: `prod` 프로필은 `PULSE_PUBLIC_BASE_URL`을 필수로 요구한다(`application-prod.yml`에 기본값이 없어 변수가 없으면 기동이 실패한다).
 - 되돌리기: 코드와 리소스를 되돌리면 된다.
 
 ## Open Questions

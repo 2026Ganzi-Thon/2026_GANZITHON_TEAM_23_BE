@@ -51,17 +51,18 @@
 #### Scenario: 색 모드 그림이 없는 상태
 - **WHEN** 색 모드 그림이 등록되지 않은 상태에서 `mode=COLOR`로 호출한다
 - **THEN** 서버는 404 `PICTURE-001`을 돌려준다
+- **AND** 응답 본문의 `status`는 404, `code`는 "PICTURE-001", `message`는 "그림을 불러오지 못했어요."이고 `errors`는 빈 배열이다
 
 ### Requirement: 찾을 대상 좌표 형식
-서버가 내려주는 `targets`는 1개 이상이어야 하고, 각 대상의 위치는 픽셀이 아닌 비율로 표현해야 한다(SHALL). `x`는 이미지 너비 기준, `y`는 이미지 높이 기준의 대상 중심 위치이고 둘 다 0 이상 1 이하다. `radius`는 정답으로 인정할 반경이며 가로와 세로 모두 이미지 너비 기준 비율로 0 이상 1 이하다. `targetId`는 한 그림 안에서 서로 다르고, 같은 `label`은 여러 대상에 쓸 수 있다.
+서버가 내려주는 `targets`는 1개 이상이어야 하고, 각 대상의 위치는 픽셀이 아닌 비율로 표현해야 한다(SHALL). `x`는 이미지 너비 기준, `y`는 이미지 높이 기준의 대상 중심 위치이고 둘 다 0 이상 1 이하다. `radius`는 정답으로 인정할 반경이며 가로와 세로 모두 이미지 너비 기준 비율로 0 초과 1 이하다. `targetId`는 한 그림 안에서 서로 다르고, 같은 `label`은 여러 대상에 쓸 수 있다.
 
 #### Scenario: 응답 좌표 범위
 - **WHEN** `mode=OBJECT`로 그림을 받는다
-- **THEN** 모든 대상의 `x`, `y`, `radius`는 0 이상 1 이하다
+- **THEN** 모든 대상의 `x`, `y`는 0 이상 1 이하이고 `radius`는 0 초과 1 이하다
 - **AND** `targetId`는 서로 다르다
 
 ### Requirement: 그림 데이터 검증
-서버는 기동할 때 그림 데이터 전체를 검사하고, 규칙을 어긴 데이터가 있으면 기동하지 않아야 한다(MUST). 규칙은 다음과 같다. `pictureId`는 전체에서 고유하다. `mode`는 `COLOR` 또는 `OBJECT`다. `aspectRatio`는 0보다 크다. `targets`는 1개 이상이다. 각 대상의 `x`, `y`, `radius`는 0 이상 1 이하다. `targetId`는 그림 안에서 고유하다. 실패 메시지에는 문제가 된 `pictureId`와 어긴 규칙을 적는다.
+서버는 기동할 때 그림 데이터 전체를 검사하고, 규칙을 어긴 데이터가 있으면 기동하지 않아야 한다(MUST). 규칙은 다음과 같다. `pictureId`는 전체에서 고유하다. `mode`는 `COLOR` 또는 `OBJECT`다. `aspectRatio`는 0보다 크다. `targets`는 1개 이상이다. 각 대상의 `x`, `y`는 0 이상 1 이하이고 `radius`는 0 초과 1 이하다. 각 대상의 `label`과 `emoji`는 비어 있지 않다. `targetId`는 그림 안에서 고유하다. 실패 메시지에는 문제가 된 `pictureId`와 어긴 규칙을 적는다.
 
 #### Scenario: 범위를 벗어난 좌표
 - **WHEN** 어떤 대상의 `x`가 1.2인 그림 데이터로 서버를 띄운다
@@ -71,12 +72,20 @@
 - **WHEN** 한 그림 안에 `targetId`가 같은 대상이 두 개 있는 데이터로 서버를 띄운다
 - **THEN** 서버는 기동에 실패한다
 
+#### Scenario: 반경이 0이거나 없음
+- **WHEN** 어떤 대상의 `radius`가 0이거나 JSON에서 `radius` 키가 빠진 그림 데이터로 서버를 띄운다
+- **THEN** 서버는 기동에 실패하고 오류 메시지에 그 그림의 `pictureId`가 들어 있다
+
+#### Scenario: 이름이나 이모지가 빈 대상
+- **WHEN** 어떤 대상의 `label` 또는 `emoji`가 비어 있는 그림 데이터로 서버를 띄운다
+- **THEN** 서버는 기동에 실패하고 오류 메시지에 그 그림의 `pictureId`가 들어 있다
+
 #### Scenario: 대상이 없는 그림
 - **WHEN** `targets`가 빈 배열인 그림 데이터로 서버를 띄운다
 - **THEN** 서버는 기동에 실패한다
 
 ### Requirement: 그림 이미지 제공
-서버는 그림 이미지 파일을 `/pictures/{파일 이름}` 경로로 토큰 없이 내려줘야 한다(SHALL). 응답의 `imageUrl`은 이 파일을 가리키는 절대 URL이다. 설정 `pulse.public-base-url`에 값이 있으면 그 값을 기준 주소로 쓰고, 없으면 요청을 받은 서버의 스킴, 호스트, 포트를 쓴다. 이 경로는 `/api/v1` 밖이라 인증하지 않는다.
+서버는 그림 이미지 파일을 `/pictures/{파일 이름}` 경로로 토큰 없이 내려줘야 한다(SHALL). 응답의 `imageUrl`은 이 파일을 가리키는 절대 URL이다. 설정 `pulse.public-base-url`에 값이 있으면 그 값을 기준 주소로 쓰고, 없으면 요청을 받은 서버의 스킴, 호스트, 포트를 쓴다. `prod` 프로필은 `PULSE_PUBLIC_BASE_URL`을 기본값 없이 요구해, 값이 없으면 기동하지 않는다(프록시 뒤에서 `Host` 헤더가 `imageUrl`에 들어가는 것을 막기 위해서다). 이 경로는 `/api/v1` 밖이라 인증하지 않는다.
 
 #### Scenario: 기준 주소 설정이 없을 때
 - **WHEN** 설정 없이 `http://localhost:8080`으로 받은 요청에서 파일 이름이 `park_01.png`인 그림을 고른다
@@ -85,6 +94,10 @@
 #### Scenario: 기준 주소 설정이 있을 때
 - **WHEN** `pulse.public-base-url`이 `https://api.example.com`이고 파일 이름이 `park_01.png`인 그림을 고른다
 - **THEN** `imageUrl`은 `https://api.example.com/pictures/park_01.png`다
+
+#### Scenario: prod에서 기준 주소 설정 누락
+- **WHEN** `prod` 프로필로 환경변수 `PULSE_PUBLIC_BASE_URL` 없이 서버를 띄운다
+- **THEN** 서버는 기동에 실패한다
 
 #### Scenario: 토큰 없이 이미지 받기
 - **WHEN** 토큰 없이 `imageUrl`에 GET 요청을 보낸다

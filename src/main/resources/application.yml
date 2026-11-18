@@ -14,6 +14,7 @@ spring:
     time-zone: Asia/Seoul
 
 pulse:
+  public-base-url: ${PULSE_PUBLIC_BASE_URL:} # 그림 imageUrl의 기준 주소. 비우면 요청을 받은 서버 주소를 쓴다. 프록시 뒤에 배포하면 외부 주소를 넣는다
   cors:
     allowed-origin-patterns: '*' # 허용할 Origin 패턴(쉼표로 여러 개). 로컬 기본은 모두 허용, 배포 때 프런트 도메인으로 좁힌다
   jwt:

@@ -553,6 +553,68 @@ class PulseFlowTest {
                 .andExpect(header().string("Access-Control-Allow-Methods", org.hamcrest.Matchers.containsString("PATCH")));
     }
 
+    // ---------- 숨은그림 ----------
+
+    private static final String PICTURE_NEXT = "/api/v1/pictures/next";
+
+    @Test
+    void pictureNextReturnsObjectModePicture() throws Exception {
+        String token = signupToken("pic01");
+        String body = mvc.perform(get(PICTURE_NEXT).param("mode", "OBJECT").header("Authorization", "Bearer " + token))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.mode").value("OBJECT"))
+                .andReturn().getResponse().getContentAsString();
+        JsonNode data = om.readTree(body).get("data");
+        assertEquals("[pictureId, mode, imageUrl, aspectRatio, targets]", fieldNames(data));
+        assertFalse(data.get("pictureId").asText().isEmpty());
+        assertTrue(data.get("imageUrl").asText().startsWith("http://localhost/pictures/"));
+        assertTrue(data.get("aspectRatio").asDouble() > 0);
+        assertTrue(data.get("targets").size() >= 1);
+        for (JsonNode t : data.get("targets")) {
+            assertEquals("[targetId, label, emoji, x, y, radius]", fieldNames(t));
+        }
+    }
+
+    @Test
+    void pictureNextAlertIdIsOptionalAndNotChecked() throws Exception {
+        String token = signupToken("pic02");
+        mvc.perform(get(PICTURE_NEXT).param("mode", "OBJECT").header("Authorization", "Bearer " + token))
+                .andExpect(status().isOk());
+        mvc.perform(get(PICTURE_NEXT).param("mode", "OBJECT").param("alertId", "alert_00000000_9999")
+                        .header("Authorization", "Bearer " + token))
+                .andExpect(status().isOk());
+    }
+
+    @Test
+    void pictureNextRequiresValidMode() throws Exception {
+        String token = signupToken("pic03");
+        mvc.perform(get(PICTURE_NEXT).header("Authorization", "Bearer " + token))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("COMMON-001"))
+                .andExpect(jsonPath("$.errors").isEmpty());
+        for (String mode : new String[] {"PURPLE", "0", "1", "object"}) {
+            mvc.perform(get(PICTURE_NEXT).param("mode", mode).header("Authorization", "Bearer " + token))
+                    .andExpect(status().isBadRequest())
+                    .andExpect(jsonPath("$.code").value("COMMON-001"))
+                    .andExpect(jsonPath("$.errors[0].field").value("mode"));
+        }
+    }
+
+    @Test
+    void pictureNextRequiresToken() throws Exception {
+        mvc.perform(get(PICTURE_NEXT).param("mode", "OBJECT"))
+                .andExpect(status().isUnauthorized())
+                .andExpect(jsonPath("$.code").value("AUTH-003"));
+    }
+
+    @Test
+    void pictureImagesAreServedWithoutToken() throws Exception {
+        mvc.perform(get("/pictures/test-pixel.png")).andExpect(status().isOk());
+        mvc.perform(get("/pictures/none.png"))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.code").value("COMMON-001"));
+    }
+
     // ---------- 공통 ----------
 
     @Test

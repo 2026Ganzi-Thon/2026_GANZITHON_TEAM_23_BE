@@ -159,25 +159,7 @@ src/test/java/com/ganzithon/pulse/PulseFlowTest.java
 
 ### 커밋 대기 중인 작업
 
-아직 커밋하지 않은 작업이다.
-
-**윤준하 (2026-11-18 합류)**
-
-- 계층형(MVC) 패키지로 리팩토링: `controller` · `service` · `repository` · `entity` · `dto/<도메인>` · `global/auth`. DTO는 record 파일 하나씩으로 나눴다.
-- 오류 7건 수정
-  - `alertId`가 `alert_20261115+0900_0001`처럼 나오던 것을 명세 형식 `alert_20261115_0001`로 고침
-  - 72바이트를 넘는 비밀번호가 500을 내던 것을 가입 400, 로그인 401로 처리
-  - 255자를 넘는 이메일이 "이미 사용 중인 아이디"(409)로 나가던 것을 입력 오류(400)로 처리
-  - 요청 파라미터 타입이 틀리면 500을 내던 것을 400으로 처리
-  - CORS 설정 추가 (`pulse.cors.allowed-origin-patterns`)
-  - `prod` 프로필의 JWT 시크릿 기본값 제거 (`JWT_SECRET` 필수)
-  - 응답 시각의 소수점 초를 잘라 `2026-11-15T14:20:00+09:00` 형식으로 맞춤
-- 로컬 설정: `ddl-auto: create-drop`, H2 콘솔(`/h2-console`)
-- 테스트를 시나리오 1개에서 10개로 나눔 (`PulseFlowTest`)
-- OpenSpec 작업 환경 (`openspec/`, `.agents/skills/openspec-*`)
-- Figma 화면 흐름 정리 ([docs/화면흐름.md](docs/화면흐름.md)), README, AGENTS.md
-
-> 커밋되면 이 소절을 비운다. 커밋은 아래 "커밋 기록"에 자동으로 들어간다.
+지금은 없다. 커밋하지 않은 작업이 생기면 이름과 함께 여기에 적고, 커밋되면 지운다. 커밋은 아래 "커밋 기록"에 자동으로 들어간다.
 
 ### 커밋 기록
 
@@ -190,9 +172,13 @@ src/test/java/com/ganzithon/pulse/PulseFlowTest.java
 | 이름 | 커밋 | 최근 커밋 |
 |---|---|---|
 | 홍명철 | 5 | 2026-11-18 |
+| 윤준하 | 3 | 2026-11-18 |
 
 #### 2026-11-18
 
+- 윤준하 · [`c939e67`](https://github.com/2026Ganzi-Thon/2026_GANZITHON_TEAM_23_BE/commit/c939e67b9eaebd6bca68567fffb90b761fb12ff5) · docs: README·AGENTS 추가, 화면 흐름 정리, 개발 현황 갱신
+- 윤준하 · [`f841eb9`](https://github.com/2026Ganzi-Thon/2026_GANZITHON_TEAM_23_BE/commit/f841eb9199032cd883367816a847bbd6a67e1550) · docs: OpenSpec spec-driven 환경 추가 (기준 스펙 4개, 변경 제안 3개)
+- 윤준하 · [`d329980`](https://github.com/2026Ganzi-Thon/2026_GANZITHON_TEAM_23_BE/commit/d329980722c3dcf6c5646731b603e6e0913c7d7c) · refactor: 계층형 MVC 구조로 재구성하고 DTO 분리, 오류 7건 수정
 - 홍명철 · [`46124a8`](https://github.com/2026Ganzi-Thon/2026_GANZITHON_TEAM_23_BE/commit/46124a873cc40df3d55416b016401f0d71b269d0) · docs: 숨은그림 응답 예시를 실제 그림 기준으로 수정
 - 홍명철 · [`1256771`](https://github.com/2026Ganzi-Thon/2026_GANZITHON_TEAM_23_BE/commit/1256771027c85b8ee33a99ff225f45999a47ba7b) · docs: API 명세서 v0.2 (팀 결정 반영)
 - 홍명철 · [`8e50e19`](https://github.com/2026Ganzi-Thon/2026_GANZITHON_TEAM_23_BE/commit/8e50e195c403297719ecb5ff445ef9e5ab533e11) · docs: 백엔드 개발 현황과 앞으로 할 일 정리

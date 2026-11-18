@@ -2,7 +2,7 @@
 
 간지톤 2026 23조 "잠깐의 쉼" 앱의 API 서버다. 애플워치 심박이 갑자기 오르면 알림을 띄우고, 숨은그림찾기로 지금 여기에 주의를 돌리도록(그라운딩) 돕는다.
 
-**현재 상태 (2026-11-18)**: API 명세 v0.2의 12개 중 4개 완료, 2개 일부, 6개 미구현. 자세한 내용은 [API 구현 현황](#api-구현-현황)에 있다.
+**현재 상태 (2026-11-18)**: API 명세 v0.2의 12개 중 12개 완료. 자세한 내용은 [API 구현 현황](#api-구현-현황)에 있다.
 
 이 README는 사람과 코딩 에이전트가 "지금 어디까지 됐고 누가 무엇을 했는지" 확인하는 문서다. 에이전트 작업 규칙은 [AGENTS.md](AGENTS.md)에 있다.
 
@@ -37,7 +37,7 @@ flowchart TD
 
 ```bash
 ./gradlew bootRun   # http://localhost:8080
-./gradlew test      # PulseFlowTest 10개
+./gradlew test      # 53개: PulseFlowTest 33, PictureCatalogTest 15, PictureServiceTest 3, PictureControllerTest 2
 ```
 
 Windows에서는 `gradlew.bat bootRun`, `gradlew.bat test`로 실행한다.
@@ -59,16 +59,17 @@ Windows에서는 `gradlew.bat bootRun`, `gradlew.bat test`로 실행한다.
 
 지금은 배포 서버 없이 로컬 H2로 개발한다. `prod` 프로필은 서버가 생길 때를 위한 설정이다.
 
-| 프로필 | DB | 스키마 | H2 콘솔 | JWT 시크릿 |
-|---|---|---|---|---|
-| 기본 (로컬·테스트) | H2 메모리 | `create-drop` | 켬 | `JWT_SECRET`, 없으면 개발용 기본값 |
-| `prod` | `DB_URL` (MySQL 드라이버 포함) | `update` | 끔 | `JWT_SECRET` 필수 |
+| 프로필 | DB | 스키마 | H2 콘솔 | JWT 시크릿 | 그림 기준 주소 |
+|---|---|---|---|---|---|
+| 기본 (로컬·테스트) | H2 메모리 | `create-drop` | 켬 | `JWT_SECRET`, 없으면 개발용 기본값 | `PULSE_PUBLIC_BASE_URL`, 없으면 요청 주소 |
+| `prod` | `DB_URL` (MySQL 드라이버 포함) | `update` | 끔 | `JWT_SECRET` 필수 | `PULSE_PUBLIC_BASE_URL` 필수 |
 
 | 환경변수 | 용도 | 기본값 |
 |---|---|---|
 | `SPRING_PROFILES_ACTIVE` | 프로필 선택 (`prod`) | 없음 (기본 프로필) |
 | `JWT_SECRET` | JWT 서명 키, 32바이트 이상 | 기본 프로필은 개발용 문자열, `prod`는 없음 (없으면 기동 실패) |
 | `JWT_EXPIRATION_MINUTES` | 토큰 만료 시간(분) | `1440` (24시간) |
+| `PULSE_PUBLIC_BASE_URL` | 그림 `imageUrl`의 기준 주소. 프록시 뒤에서 이 값이 없으면 `Host` 헤더가 그대로 들어가 `http://` 주소가 나가고 iOS가 이미지를 막는다 | 기본 프로필은 빈 값 (요청을 받은 서버 주소), `prod`는 없음 (없으면 기동 실패) |
 | `DB_URL` · `DB_USERNAME` · `DB_PASSWORD` | `prod` DB 접속 정보 | 없음 (`prod`에서 필수) |
 
 `application.yml`의 서비스 설정값은 다음과 같다.
@@ -78,6 +79,7 @@ Windows에서는 `gradlew.bat bootRun`, `gradlew.bat test`로 실행한다.
 | `pulse.alert.base-threshold` | `25` | 알림 기준. 평소 대비 bpm 상승폭의 시작값 |
 | `pulse.alert.dismiss-step` | `5` | "괜찮아요" 한 번에 올리는 기준값 |
 | `pulse.alert.max-threshold` | `45` | 기준값 상한 |
+| `pulse.public-base-url` | `''` | 그림 `imageUrl`의 기준 주소. 비우면 요청을 받은 서버 주소를 쓴다. `application-prod.yml`은 기본값 없이 `PULSE_PUBLIC_BASE_URL`을 요구한다 |
 | `pulse.cors.allowed-origin-patterns` | `'*'` | CORS 허용 Origin 패턴. 쉼표로 여러 개. 배포 때 FE 도메인으로 좁힌다 |
 
 ## 기술 스택과 패키지 구조
@@ -95,21 +97,30 @@ Spring Security 필터 체인은 쓰지 않는다. `AuthInterceptor`(`HandlerInt
 ```
 src/main/java/com/ganzithon/pulse
 ├── PulseApplication.java
-├── controller/     AuthController · AlertController · RecordController
-├── service/        AuthService · AlertService · RecordService
-├── repository/     UserRepository · AlertRepository · RecordRepository
-├── entity/         User · Alert · ActivityRecord
+├── controller/     AuthController · AlertController · RecordController · PictureController · UserController
+├── service/        AuthService · AlertService · RecordService · PictureService · UserService
+├── repository/     UserRepository · AlertRepository · RecordRepository · PictureCatalog (그림 JSON 카탈로그)
+├── entity/         User · Alert · ActivityRecord · Mode · NextAction
 ├── dto/
 │   ├── auth/       SignupRequest · LoginRequest · AuthResponse · UserInfo
 │   ├── alert/      SpikeRequest · SpikeResponse
-│   └── record/     RecordRequest · RecordResponse
+│   ├── record/     RecordRequest · RecordResponse · NextActionRequest
+│   ├── picture/    PictureResponse · TargetResponse
+│   └── user/       GuardianRequest · GuardianResponse · MeResponse · UpdateMeRequest
 └── global/
     ├── auth/       AuthInterceptor · JwtProvider
     ├── config/     WebConfig (CORS, 인터셉터 등록, PasswordEncoder)
     ├── exception/  ErrorCode · BusinessException · ErrorResponse · GlobalExceptionHandler
     ├── response/   ApiResponse
-    └── util/       TimeFormat
-src/test/java/com/ganzithon/pulse/PulseFlowTest.java
+    └── util/       TimeFormat · PublicUrlResolver · StrictIntegerDeserializer
+src/main/resources/pictures/catalog.json   (그림과 대상 좌표)
+src/main/resources/static/pictures/        (그림 이미지, 아직 없음)
+src/test/java/com/ganzithon/pulse
+├── PulseFlowTest.java
+├── controller/     PictureControllerTest (PICTURE-001의 HTTP 응답)
+├── repository/     PictureCatalogTest
+└── service/        PictureServiceTest
+src/test/resources/static/pictures/test-pixel.png   (정적 이미지 경로 확인용)
 ```
 
 계층 규칙은 다음과 같다. 전체 규칙은 [AGENTS.md](AGENTS.md)에 있다.
@@ -129,16 +140,17 @@ src/test/java/com/ganzithon/pulse/PulseFlowTest.java
 | 3.2 | POST | `/auth/login` | 완료 | 기준 스펙 `auth` |
 | 4.1 | POST | `/heart-rate/spikes` | 완료 | 기준 스펙 `heart-rate-alert` |
 | 4.2 | POST | `/alerts/{alertId}/dismiss` | 완료 | 기준 스펙 `heart-rate-alert` |
-| 5.1 | GET | `/pictures/next` | 미구현 | `add-picture-next` |
-| 6.1 | GET | `/records` | 일부 (`mode`·`nextAction` 필드 없음) | `add-record-mode-next-action` |
-| 6.2 | POST | `/records` | 일부 (`mode`·`nextAction` 필드 없음) | `add-record-mode-next-action` |
-| 6.3 | POST | `/records/{recordId}/next-action` | 미구현 | `add-record-mode-next-action` |
-| 7.1 | GET | `/users/me` | 미구현 | `add-mypage-guardian` |
-| 7.2 | PATCH | `/users/me` | 미구현 | `add-mypage-guardian` |
-| 7.3 | PUT | `/users/me/guardian` | 미구현 | `add-mypage-guardian` |
-| 7.4 | DELETE | `/users/me/guardian` | 미구현 | `add-mypage-guardian` |
+| 5.1 | GET | `/pictures/next` | 완료 (그림 데이터는 확정 전 명세 예시) | `add-picture-next` |
+| 6.1 | GET | `/records` | 완료 | 기준 스펙 `activity-record` |
+| 6.2 | POST | `/records` | 완료 | 기준 스펙 `activity-record` |
+| 6.3 | POST | `/records/{recordId}/next-action` | 완료 | 기준 스펙 `activity-record` |
+| 7.1 | GET | `/users/me` | 완료 | 기준 스펙 `user-profile` |
+| 7.2 | PATCH | `/users/me` | 완료 | 기준 스펙 `user-profile` |
+| 7.3 | PUT | `/users/me/guardian` | 완료 | 기준 스펙 `guardian-contact` |
+| 7.4 | DELETE | `/users/me/guardian` | 완료 | 기준 스펙 `guardian-contact` |
 
-- 공통 규칙(명세 2장)인 응답 형식, 오류 응답, 시각 형식은 구현돼 있다(기준 스펙 `api-common`). 오류 코드 중 `RECORD-001`만 아직 없고, 6.3과 함께 추가한다.
+- 공통 규칙(명세 2장)인 응답 형식, 오류 응답, 시각 형식은 구현돼 있다(기준 스펙 `api-common`).
+- 5.1의 이미지 파일과 좌표는 팀 확정 전이라 `catalog.json`은 명세 예시 데이터이고, 이미지 파일이 아직 없어 `imageUrl`(`/pictures/park_01.png`)은 404다. 색 모드 그림도 없어 `mode=COLOR`는 404 `PICTURE-001`이다.
 - 6.1·6.2의 `activityName`은 지금 `"숨은그림찾기"`로 고정돼 있다(`RecordService.DEFAULT_ACTIVITY`).
 - 변경별 진행 상황은 `openspec list`로 확인한다.
 
@@ -171,11 +183,15 @@ src/test/java/com/ganzithon/pulse/PulseFlowTest.java
 
 | 이름 | 커밋 | 최근 커밋 |
 |---|---|---|
+| 윤준하 | 7 | 2026-11-18 |
 | 홍명철 | 5 | 2026-11-18 |
-| 윤준하 | 3 | 2026-11-18 |
 
 #### 2026-11-18
 
+- 윤준하 · [`f6b2036`](https://github.com/2026Ganzi-Thon/2026_GANZITHON_TEAM_23_BE/commit/f6b20364603ace327a435809514fb289877955f3) · feat: 숨은그림 받기 API (명세 5.1)
+- 윤준하 · [`1a3f36a`](https://github.com/2026Ganzi-Thon/2026_GANZITHON_TEAM_23_BE/commit/1a3f36ab3d87505b54bbd607bbb2fb9f46cdebfd) · feat: 마이페이지와 보호자 연락처 API (명세 7.1~7.4)
+- 윤준하 · [`4fe974d`](https://github.com/2026Ganzi-Thon/2026_GANZITHON_TEAM_23_BE/commit/4fe974d5acd1fe655deb7d8532f45dfb5a289c8e) · feat: 활동 기록에 mode·nextAction 추가, 다음 행동 기록 API (명세 6.1~6.3)
+- 윤준하 · [`a1c1d28`](https://github.com/2026Ganzi-Thon/2026_GANZITHON_TEAM_23_BE/commit/a1c1d28a79a1e4f3c47f116baf82a8279f68dd5e) · docs: README 기여 기록 갱신
 - 윤준하 · [`c939e67`](https://github.com/2026Ganzi-Thon/2026_GANZITHON_TEAM_23_BE/commit/c939e67b9eaebd6bca68567fffb90b761fb12ff5) · docs: README·AGENTS 추가, 화면 흐름 정리, 개발 현황 갱신
 - 윤준하 · [`f841eb9`](https://github.com/2026Ganzi-Thon/2026_GANZITHON_TEAM_23_BE/commit/f841eb9199032cd883367816a847bbd6a67e1550) · docs: OpenSpec spec-driven 환경 추가 (기준 스펙 4개, 변경 제안 3개)
 - 윤준하 · [`d329980`](https://github.com/2026Ganzi-Thon/2026_GANZITHON_TEAM_23_BE/commit/d329980722c3dcf6c5646731b603e6e0913c7d7c) · refactor: 계층형 MVC 구조로 재구성하고 DTO 분리, 오류 7건 수정

@@ -31,7 +31,7 @@
 ## ADDED Requirements
 
 ### Requirement: 활동 모드 필수
-서버는 기록 저장 요청의 `mode`를 필수로 받아야 하며, 값은 대문자 `COLOR`(색 모드) 또는 `OBJECT`(사물 모드)여야 한다(SHALL). `mode`가 없거나 `null`이면 400 `COMMON-001`과 `errors`의 `mode` 항목(이유 "모드가 필요해요.")을 돌려준다. 두 값이 아닌 문자열이면 본문을 읽을 수 없는 것으로 보고 400 `COMMON-001`과 빈 `errors`를 돌려준다.
+서버는 기록 저장 요청의 `mode`를 필수로 받아야 하며, 값은 대문자 `COLOR`(색 모드) 또는 `OBJECT`(사물 모드)여야 한다(SHALL). `mode`가 없거나 `null`이면 400 `COMMON-001`과 `errors`의 `mode` 항목(이유 "모드가 필요해요.")을 돌려준다. 두 값이 아닌 문자열이나 `0`, `"1"` 같은 순번(숫자와 숫자 문자열)이면 본문을 읽을 수 없는 것으로 보고 400 `COMMON-001`과 빈 `errors`를 돌려준다. 소문자(`"color"`)도 받지 않는다.
 
 #### Scenario: 모드 누락
 - **WHEN** `mode` 없이 `afterScore` 3만 보내 저장한다
@@ -40,6 +40,14 @@
 #### Scenario: 정의되지 않은 모드
 - **WHEN** `mode`를 "REAL"로 보내 저장한다
 - **THEN** 서버는 400 `COMMON-001`을 돌려주고 `errors`는 빈 배열이다
+
+#### Scenario: 숫자 모드
+- **WHEN** `mode`를 숫자 0으로 보내 저장한다
+- **THEN** 서버는 400 `COMMON-001`을 돌려주고 기록을 저장하지 않는다
+
+#### Scenario: 숫자 문자열 모드
+- **WHEN** `mode`를 문자열 "1"로 보내 저장한다
+- **THEN** 서버는 400 `COMMON-001`을 돌려주고 기록을 저장하지 않는다
 
 ### Requirement: 다음 행동 기록
 서버는 `POST /api/v1/records/{recordId}/next-action`으로 본문 `{"action": ...}`을 받아 그 기록의 `nextAction`에 저장해야 한다(SHALL). `action` 값은 `IMPROVED`(나아졌어요), `RETRY`(한 번 더), `HELP`(도움 요청) 중 하나다. 성공하면 200과 `message: "처리되었습니다."`를 돌려준다.
@@ -70,11 +78,19 @@
 - **AND** 그 기록의 주인이 목록을 조회하면 `nextAction`은 바뀌지 않았다
 
 ### Requirement: 다음 행동 입력 검증
-서버는 다음 행동 요청의 입력이 잘못되면 400 `COMMON-001`을 돌려줘야 한다(SHALL). `action`이 없거나 `null`이면 `errors`에 `action` 항목(이유 "다음 행동이 필요해요.")을 담는다. `action`이 세 값이 아닌 문자열이면 `errors`는 빈 배열이다. `recordId`가 숫자가 아니면 `errors`에 `recordId` 항목을 담는다.
+서버는 다음 행동 요청의 입력이 잘못되면 400 `COMMON-001`을 돌려줘야 한다(SHALL). `action`이 없거나 `null`이면 `errors`에 `action` 항목(이유 "다음 행동이 필요해요.")을 담는다. `action`이 세 값이 아닌 문자열이거나 `1`, `"2"` 같은 순번(숫자와 숫자 문자열)이면 `errors`는 빈 배열이다. `recordId`가 숫자가 아니면 `errors`에 `recordId` 항목을 담는다.
 
 #### Scenario: 정의되지 않은 행동
 - **WHEN** `{"action": "LATER"}`를 보낸다
 - **THEN** 서버는 400 `COMMON-001`을 돌려준다
+
+#### Scenario: 숫자 행동
+- **WHEN** `{"action": 1}`을 보낸다
+- **THEN** 서버는 400 `COMMON-001`을 돌려주고 기록의 `nextAction`은 바뀌지 않았다
+
+#### Scenario: 숫자 문자열 행동
+- **WHEN** `{"action": "2"}`를 보낸다
+- **THEN** 서버는 400 `COMMON-001`을 돌려주고 기록의 `nextAction`은 바뀌지 않았다
 
 #### Scenario: 행동 누락
 - **WHEN** 빈 객체 `{}`를 보낸다
@@ -83,3 +99,29 @@
 #### Scenario: 숫자가 아닌 기록 ID
 - **WHEN** `POST /api/v1/records/abc/next-action`을 호출한다
 - **THEN** 서버는 400 `COMMON-001`을 돌려주고 `errors[0].field`는 "recordId"다
+
+### Requirement: 활동 점수는 정수
+서버는 `beforeScore`와 `afterScore`를 JSON 정수로만 받아야 한다(SHALL). `2.5` 같은 소수, `3.0`, `"3"` 같은 문자열, int 범위를 넘는 수는 저장하지 않고 400 `COMMON-001`과 빈 `errors`를 돌려준다. 이 규칙은 기록 저장 요청의 두 점수 필드에만 적용한다.
+
+#### Scenario: 소수 점수
+- **WHEN** `afterScore`를 2.5로 보낸다
+- **THEN** 서버는 400 `COMMON-001`을 돌려주고 기록을 저장하지 않는다
+
+#### Scenario: 문자열 점수
+- **WHEN** `beforeScore`를 문자열 "3"으로 보낸다
+- **THEN** 서버는 400 `COMMON-001`을 돌려주고 기록을 저장하지 않는다
+
+### Requirement: 그림 ID와 알림 ID 길이 제한
+서버는 `pictureId`와 `alertId`가 255자를 넘으면 400 `COMMON-001`과 `errors`의 해당 필드 항목을 돌려줘야 한다(SHALL). 255자까지는 존재 여부를 확인하지 않고 받은 값 그대로 저장한다.
+
+#### Scenario: 255자 그림 ID
+- **WHEN** `pictureId`와 `alertId`를 각각 255자로 저장한다
+- **THEN** 서버는 201을 돌려준다
+
+#### Scenario: 255자를 넘는 그림 ID
+- **WHEN** `pictureId`를 256자로 보내 저장한다
+- **THEN** 서버는 400 `COMMON-001`을 돌려주고 `errors`에 `pictureId` 항목이 들어 있다
+
+#### Scenario: 255자를 넘는 알림 ID
+- **WHEN** `alertId`를 256자로 보내 저장한다
+- **THEN** 서버는 400 `COMMON-001`을 돌려주고 `errors`에 `alertId` 항목이 들어 있다

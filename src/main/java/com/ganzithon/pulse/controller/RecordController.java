@@ -1,5 +1,6 @@
 package com.ganzithon.pulse.controller;
 
+import com.ganzithon.pulse.dto.record.NextActionRequest;
 import com.ganzithon.pulse.dto.record.RecordRequest;
 import com.ganzithon.pulse.dto.record.RecordResponse;
 import com.ganzithon.pulse.global.auth.AuthInterceptor;
@@ -29,5 +30,13 @@ public class RecordController {
     public ApiResponse<RecordResponse> save(@RequestAttribute(AuthInterceptor.USER_ID) Long userId,
                                             @Valid @RequestBody RecordRequest request) {
         return ApiResponse.ok(recordService.save(userId, request));
+    }
+
+    @PostMapping("/{recordId}/next-action")
+    public ApiResponse<Void> recordNextAction(@RequestAttribute(AuthInterceptor.USER_ID) Long userId,
+                                              @PathVariable Long recordId,
+                                              @Valid @RequestBody NextActionRequest request) {
+        recordService.recordNextAction(userId, recordId, request);
+        return ApiResponse.message("처리되었습니다.");
     }
 }

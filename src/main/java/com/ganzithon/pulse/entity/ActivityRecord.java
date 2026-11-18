@@ -16,6 +16,10 @@ public class ActivityRecord {
     @Column(nullable = false)
     private String activityName;
 
+    @Enumerated(EnumType.STRING)
+    @Column(nullable = false)
+    private Mode mode;
+
     private String pictureId;
     private String alertId;
     private Integer beforeScore;
@@ -23,15 +27,19 @@ public class ActivityRecord {
     @Column(nullable = false)
     private int afterScore;
 
+    @Enumerated(EnumType.STRING)
+    private NextAction nextAction;
+
     @Column(nullable = false)
     private Instant createdAt = Instant.now();
 
     protected ActivityRecord() {}
 
-    public ActivityRecord(Long userId, String activityName, String pictureId, String alertId,
+    public ActivityRecord(Long userId, String activityName, Mode mode, String pictureId, String alertId,
                           Integer beforeScore, int afterScore) {
         this.userId = userId;
         this.activityName = activityName;
+        this.mode = mode;
         this.pictureId = pictureId;
         this.alertId = alertId;
         this.beforeScore = beforeScore;
@@ -40,8 +48,12 @@ public class ActivityRecord {
 
     public Long getId() { return id; }
     public String getActivityName() { return activityName; }
+    public Mode getMode() { return mode; }
     public String getPictureId() { return pictureId; }
     public Integer getBeforeScore() { return beforeScore; }
     public int getAfterScore() { return afterScore; }
+    public NextAction getNextAction() { return nextAction; }
     public Instant getCreatedAt() { return createdAt; }
+
+    public void recordNextAction(NextAction nextAction) { this.nextAction = nextAction; }
 }

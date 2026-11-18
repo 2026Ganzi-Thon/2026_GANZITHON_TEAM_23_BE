@@ -3,44 +3,36 @@ package com.ganzithon.pulse;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.options;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.header;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.ganzithon.pulse.repository.UserRepository;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.context.annotation.Import;
 import org.springframework.http.MediaType;
 import org.springframework.test.web.servlet.MockMvc;
-import org.springframework.web.bind.annotation.GetMapping;
-import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RequestParam;
-import org.springframework.web.bind.annotation.RestController;
+import org.springframework.test.web.servlet.request.MockHttpServletRequestBuilder;
 
 /** 테스트끼리 같은 컨텍스트·DB를 공유하므로, 테스트마다 다른 loginId를 써서 실행 순서에 의존하지 않는다. */
 @SpringBootTest
 @AutoConfigureMockMvc
-@Import(PulseFlowTest.TypedParamController.class)
 class PulseFlowTest {
-    /** 타입 불일치 처리 확인용. 실제 API에는 아직 숫자 파라미터를 받는 엔드포인트가 없어서 테스트에서만 둔다 */
-    @RestController
-    @RequestMapping("/api/v1/test-only")
-    static class TypedParamController {
-        @GetMapping("/typed")
-        String typed(@RequestParam int n) { return "ok"; }
-    }
-
     private static final String SPIKE = "{\"bpm\":108,\"baselineBpm\":74,\"steps\":null,\"measuredAt\":\"2026-11-15T14:20:00.000Z\"}";
 
     @Autowired MockMvc mvc;
     @Autowired ObjectMapper om;
+    @Autowired UserRepository userRepository;
 
     private String call(String url, String body, String token, int status) throws Exception {
         var req = post(url).contentType(MediaType.APPLICATION_JSON).content(body);
@@ -165,9 +157,9 @@ class PulseFlowTest {
         String token = signupToken("record01");
         String alertId = spike(token).at("/data/alertId").asText();
 
-        call("/api/v1/records", "{\"pictureId\":null,\"alertId\":null,\"beforeScore\":null,\"afterScore\":3}", token, 201);
-        call("/api/v1/records", "{\"pictureId\":\"pic_park_01\",\"alertId\":\"" + alertId + "\",\"beforeScore\":4,\"afterScore\":2}", token, 201);
-        call("/api/v1/records", "{\"afterScore\":6}", token, 400);
+        call("/api/v1/records", "{\"mode\":\"COLOR\",\"pictureId\":null,\"alertId\":null,\"beforeScore\":null,\"afterScore\":3}", token, 201);
+        call("/api/v1/records", "{\"mode\":\"OBJECT\",\"pictureId\":\"pic_park_01\",\"alertId\":\"" + alertId + "\",\"beforeScore\":4,\"afterScore\":2}", token, 201);
+        call("/api/v1/records", "{\"mode\":\"COLOR\",\"afterScore\":6}", token, 400);
         mvc.perform(get("/api/v1/records").header("Authorization", "Bearer " + token))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.length()").value(2))
@@ -176,6 +168,164 @@ class PulseFlowTest {
                 .andExpect(jsonPath("$.data[1].beforeScore").doesNotExist())
                 .andExpect(jsonPath("$.data[0].createdAt")
                         .value(org.hamcrest.Matchers.matchesPattern("\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}\\+09:00")));
+    }
+
+    private static final String LIST_AUTH = "Authorization";
+
+    private Long saveRecord(String token, String mode) throws Exception {
+        String body = call("/api/v1/records", "{\"mode\":\"" + mode + "\",\"afterScore\":3}", token, 201);
+        return om.readTree(body).at("/data/recordId").asLong();
+    }
+
+    private JsonNode records(String token) throws Exception {
+        return om.readTree(mvc.perform(get("/api/v1/records").header(LIST_AUTH, "Bearer " + token))
+                .andExpect(status().isOk()).andReturn().getResponse().getContentAsString()).get("data");
+    }
+
+    @Test
+    void recordModeIsRequiredAndReturned() throws Exception {
+        String token = signupToken("recmode01");
+
+        JsonNode missing = om.readTree(call("/api/v1/records", "{\"afterScore\":3}", token, 400));
+        assertEquals("COMMON-001", missing.get("code").asText());
+        assertEquals("mode", missing.at("/errors/0/field").asText());
+        assertEquals("모드가 필요해요.", missing.at("/errors/0/reason").asText());
+
+        JsonNode undefined = om.readTree(call("/api/v1/records", "{\"mode\":\"REAL\",\"afterScore\":3}", token, 400));
+        assertEquals("COMMON-001", undefined.get("code").asText());
+        assertEquals(0, undefined.get("errors").size());
+
+        JsonNode saved = om.readTree(call("/api/v1/records", "{\"mode\":\"OBJECT\",\"afterScore\":3}", token, 201));
+        assertEquals("OBJECT", saved.at("/data/mode").asText());
+        assertTrue(saved.get("data").has("nextAction"));
+        assertTrue(saved.at("/data/nextAction").isNull());
+
+        JsonNode first = records(token).get(0);
+        assertEquals("OBJECT", first.get("mode").asText());
+        assertTrue(first.has("nextAction"));
+        assertTrue(first.get("nextAction").isNull());
+    }
+
+    @Test
+    void nextActionIsRecordedAndOverwritten() throws Exception {
+        String token = signupToken("nextact01");
+        Long objectId = saveRecord(token, "OBJECT");
+        saveRecord(token, "COLOR");
+
+        JsonNode ok = om.readTree(call("/api/v1/records/" + objectId + "/next-action", "{\"action\":\"IMPROVED\"}", token, 200));
+        assertEquals("처리되었습니다.", ok.get("message").asText());
+        JsonNode list = records(token);
+        assertEquals("COLOR", list.get(0).get("mode").asText());
+        assertTrue(list.get(0).get("nextAction").isNull());
+        assertEquals("OBJECT", list.get(1).get("mode").asText());
+        assertEquals("IMPROVED", list.get(1).get("nextAction").asText());
+
+        call("/api/v1/records/" + objectId + "/next-action", "{\"action\":\"RETRY\"}", token, 200);
+        assertEquals("RETRY", records(token).get(1).get("nextAction").asText());
+        call("/api/v1/records/" + objectId + "/next-action", "{\"action\":\"HELP\"}", token, 200);
+        assertEquals("HELP", records(token).get(1).get("nextAction").asText());
+    }
+
+    @Test
+    void nextActionRejectsMissingOrOthersRecord() throws Exception {
+        String owner = signupToken("nextown01");
+        String other = signupToken("nextown02");
+        Long recordId = saveRecord(owner, "COLOR");
+
+        JsonNode none = om.readTree(call("/api/v1/records/999999/next-action", "{\"action\":\"RETRY\"}", owner, 404));
+        assertEquals("RECORD-001", none.get("code").asText());
+        assertEquals("기록을 찾을 수 없어요.", none.get("message").asText());
+
+        JsonNode notMine = om.readTree(call("/api/v1/records/" + recordId + "/next-action", "{\"action\":\"RETRY\"}", other, 404));
+        assertEquals("RECORD-001", notMine.get("code").asText());
+        assertTrue(records(owner).get(0).get("nextAction").isNull());
+    }
+
+    @Test
+    void nextActionValidatesInput() throws Exception {
+        String token = signupToken("nextval01");
+        Long recordId = saveRecord(token, "COLOR");
+        String url = "/api/v1/records/" + recordId + "/next-action";
+
+        JsonNode undefined = om.readTree(call(url, "{\"action\":\"LATER\"}", token, 400));
+        assertEquals("COMMON-001", undefined.get("code").asText());
+
+        JsonNode empty = om.readTree(call(url, "{}", token, 400));
+        assertEquals("COMMON-001", empty.get("code").asText());
+        assertEquals("action", empty.at("/errors/0/field").asText());
+        assertEquals("다음 행동이 필요해요.", empty.at("/errors/0/reason").asText());
+
+        JsonNode badId = om.readTree(call("/api/v1/records/abc/next-action", "{\"action\":\"RETRY\"}", token, 400));
+        assertEquals("COMMON-001", badId.get("code").asText());
+        assertEquals("recordId", badId.at("/errors/0/field").asText());
+
+        JsonNode noToken = om.readTree(call(url, "{\"action\":\"RETRY\"}", null, 401));
+        assertEquals("AUTH-003", noToken.get("code").asText());
+        assertTrue(records(token).get(0).get("nextAction").isNull());
+    }
+
+    @Test
+    void modeAndActionRejectOrdinals() throws Exception {
+        String token = signupToken("ordinal01");
+
+        // 순번(숫자·숫자 문자열)은 이름이 아니므로 읽기 오류(400)다. 기존 잘못된 enum 값과 같은 응답 형식이다
+        for (String mode : new String[] {"0", "1", "\"0\"", "\"1\"", "\"color\"", "true", "[]"}) {
+            JsonNode res = om.readTree(call("/api/v1/records", "{\"mode\":" + mode + ",\"afterScore\":3}", token, 400));
+            assertEquals("COMMON-001", res.get("code").asText(), mode);
+            assertEquals(400, res.get("status").asInt(), mode);
+            assertEquals(0, res.get("errors").size(), mode);
+        }
+        assertEquals(0, records(token).size());
+        assertEquals("COLOR", om.readTree(call("/api/v1/records", "{\"mode\":\"COLOR\",\"afterScore\":3}", token, 201))
+                .at("/data/mode").asText());
+
+        Long recordId = records(token).get(0).get("recordId").asLong();
+        String url = "/api/v1/records/" + recordId + "/next-action";
+        for (String action : new String[] {"0", "1", "\"1\"", "\"2\"", "\"retry\"", "false"}) {
+            JsonNode res = om.readTree(call(url, "{\"action\":" + action + "}", token, 400));
+            assertEquals("COMMON-001", res.get("code").asText(), action);
+            assertEquals(0, res.get("errors").size(), action);
+            assertTrue(records(token).get(0).get("nextAction").isNull(), action);
+        }
+        // 이름 문자열은 그대로 받는다
+        call(url, "{\"action\":\"RETRY\"}", token, 200);
+        assertEquals("RETRY", records(token).get(0).get("nextAction").asText());
+        // 순번으로 덮어쓰려 해도 기존 값이 유지된다
+        call(url, "{\"action\":2}", token, 400);
+        assertEquals("RETRY", records(token).get(0).get("nextAction").asText());
+    }
+
+    @Test
+    void recordScoreMustBeIntegerNumber() throws Exception {
+        String token = signupToken("recint01");
+        // 소수와 문자열은 정수로 바꿔 받지 않고 400이다
+        for (String score : new String[] {"2.5", "\"3\"", "3.0", "99999999999"}) {
+            JsonNode after = om.readTree(call("/api/v1/records", "{\"mode\":\"COLOR\",\"afterScore\":" + score + "}", token, 400));
+            assertEquals("COMMON-001", after.get("code").asText());
+            JsonNode before = om.readTree(call("/api/v1/records",
+                    "{\"mode\":\"COLOR\",\"beforeScore\":" + score + ",\"afterScore\":3}", token, 400));
+            assertEquals("COMMON-001", before.get("code").asText());
+        }
+        assertEquals(0, records(token).size());
+        call("/api/v1/records", "{\"mode\":\"COLOR\",\"beforeScore\":4,\"afterScore\":3}", token, 201);
+    }
+
+    @Test
+    void recordIdsOver255CharsAreBadRequestNot500() throws Exception {
+        String token = signupToken("reclen01");
+        String max = "p".repeat(255);
+        String over = "p".repeat(256);
+
+        call("/api/v1/records", "{\"mode\":\"COLOR\",\"pictureId\":\"" + max + "\",\"alertId\":\"" + max + "\",\"afterScore\":3}", token, 201);
+
+        JsonNode picture = om.readTree(call("/api/v1/records",
+                "{\"mode\":\"COLOR\",\"pictureId\":\"" + over + "\",\"afterScore\":3}", token, 400));
+        assertEquals("COMMON-001", picture.get("code").asText());
+        assertEquals("pictureId", picture.at("/errors/0/field").asText());
+        JsonNode alert = om.readTree(call("/api/v1/records",
+                "{\"mode\":\"COLOR\",\"alertId\":\"" + over + "\",\"afterScore\":3}", token, 400));
+        assertEquals("COMMON-001", alert.get("code").asText());
+        assertEquals("alertId", alert.at("/errors/0/field").asText());
     }
 
     // ---------- 공통 ----------
@@ -187,16 +337,5 @@ class PulseFlowTest {
                         .header("Access-Control-Request-Method", "GET"))
                 .andExpect(status().isOk())
                 .andExpect(header().exists("Access-Control-Allow-Origin"));
-    }
-
-    @Test
-    void typeMismatchIsBadRequestNot500() throws Exception {
-        String token = signupToken("typed01");
-        mvc.perform(get("/api/v1/test-only/typed").param("n", "abc").header("Authorization", "Bearer " + token))
-                .andExpect(status().isBadRequest())
-                .andExpect(jsonPath("$.code").value("COMMON-001"))
-                .andExpect(jsonPath("$.errors[0].field").value("n"));
-        mvc.perform(get("/api/v1/test-only/typed").param("n", "1").header("Authorization", "Bearer " + token))
-                .andExpect(status().isOk());
     }
 }

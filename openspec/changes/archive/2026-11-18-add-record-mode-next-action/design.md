@@ -91,7 +91,7 @@
 
 ## Open Questions
 
-이번 변경의 범위와 결정에는 영향이 없지만 팀 결정이 필요한 것들이다.
+없음. 아래 두 건은 구현 때 이 변경에서 함께 해결했다.
 
-- 소수 점수: 현재 서버는 `afterScore: 2.5`를 받아 2로 저장하고, 문자열 `"3"`도 3으로 받는다(2026-11-18 로컬 실행으로 확인). 명세 6.2는 "점수가 1~5 정수가 아님"을 `COMMON-001`로 정했다. 고치려면 JSON 숫자 변환을 엄격하게 하는 설정이 필요하고, 그 설정은 다른 숫자 필드(`bpm` 등)에도 함께 적용된다. 별도 변경으로 다룰지 정해야 한다.
-- `pictureId`, `alertId` 길이: 지금은 길이 제한이 없어 255자를 넘으면 DB 저장 단계에서 500 `COMMON-002`가 난다(2026-11-18 로컬 실행으로 확인). `@Size(max = 255)` 같은 검증을 넣어 400으로 바꿀지 정해야 한다. 존재 여부를 확인하지 않는다는 결정과는 별개다.
+- 소수·문자열 점수: 전역 Jackson 설정(`accept-float-as-int: false`, `allow-coercion-of-scalars: false`)을 먼저 확인했다. 설정은 효과가 있지만 `/heart-rate/spikes`의 `bpm`(명세 4.1에 "number"로만 적혀 소수 허용 여부가 불분명하다), `baselineBpm`, `steps`에도 적용돼 4.1의 입력 계약이 바뀐다. 그래서 전역 설정은 쓰지 않고 `global/util/StrictIntegerDeserializer`를 `RecordRequest`의 두 점수 필드에만 붙였다. `@JsonFormat(lenient = OptBoolean.FALSE)`는 record 컴포넌트에서 소수·문자열을 막지 못해 쓰지 않았다.
+- `pictureId`, `alertId` 길이: `@Size(max = 255)`로 400 `COMMON-001`을 돌려준다. 존재 여부를 확인하지 않는다는 결정(결정 6)은 그대로다.

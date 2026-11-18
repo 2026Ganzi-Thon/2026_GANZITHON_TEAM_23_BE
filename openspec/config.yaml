@@ -1,0 +1,71 @@
+schema: spec-driven
+
+context: |
+  Language: ko
+  All artifacts must be written in ko.
+  Keep OpenSpec structural headings and SHALL/MUST keywords in English.
+
+  [프로젝트]
+  잠깐의 쉼(pulse) 백엔드, 간지톤 2026 23조.
+  애플워치 심박이 갑자기 오르면 앱이 알림을 띄우고, 숨은그림찾기로 지금 여기에 집중하도록 돕는 앱의 API 서버다.
+  프론트는 Expo(React Native) 앱이다. 백엔드는 2명(홍명철, 윤준하)이 코딩 에이전트로 개발한다.
+
+  [스택]
+  - Java 21, Spring Boot 3.4.5, Gradle wrapper(`./gradlew`)
+  - Spring Web, Spring Data JPA, Bean Validation, jjwt
+  - 비밀번호 해시는 `spring-security-crypto`의 BCrypt만 쓴다.
+  - Lombok은 쓰지 않는다. DTO는 Java record다.
+  - DB: 로컬과 테스트는 H2 메모리 DB(`ddl-auto: create-drop`)다. 운영은 `prod` 프로필이고 환경변수 `DB_URL`로 MySQL에 붙으며 `ddl-auto: update`다.
+
+  [패키지와 계층 규칙] 기준 패키지 `com.ganzithon.pulse`
+  - `controller/`: 요청 검증(`@Valid`)과 `ApiResponse` 래핑만 한다.
+  - `service/`: 비즈니스 로직과 트랜잭션을 맡는다.
+  - `repository/`: Spring Data JPA 인터페이스를 둔다.
+  - `entity/`: JPA 엔티티와 enum을 둔다.
+  - `dto/<도메인>/`: record 하나당 파일 하나를 둔다. 예: `dto/record/RecordRequest.java`
+  - `global/auth`(JWT, 인터셉터), `global/config`(WebConfig), `global/exception`(ErrorCode, BusinessException, ErrorResponse, GlobalExceptionHandler), `global/response`(ApiResponse), `global/util`(TimeFormat)
+  - Controller는 Entity와 Repository를 직접 다루지 않는다. Service가 DTO를 만들어 돌려준다.
+
+  [금지 사항]
+  - Spring Security 필터 체인(`spring-boot-starter-security`)을 도입하지 않는다. 인증은 `global/auth/AuthInterceptor`가 맡는다.
+  - Lombok을 쓰지 않는다.
+  - 새 의존성이 필요하면 proposal이나 design에 이유를 적는다.
+
+  [공통 API 규칙] 원문은 `docs/API명세서.md` 2장
+  - Base URL은 `/api/v1`이다. 본문은 JSON이고 필드 이름은 camelCase다.
+  - 성공 응답은 `ApiResponse`로 감싼다. 데이터가 있으면 `ApiResponse.ok(data)`, 결과만 알리면 `ApiResponse.message("처리되었습니다.")`를 쓴다.
+  - 오류 응답은 `ErrorResponse`(`timestamp`, `status`, `code`, `message`, `errors`, `path`)다. 새 오류 코드는 `ErrorCode` enum에 추가하고 `throw new BusinessException(ErrorCode.X)`로 던진다.
+  - `/api/v1/auth/**`를 뺀 `/api/v1/**`는 모두 JWT 인증 대상이다. Controller는 사용자 ID를 `@RequestAttribute(AuthInterceptor.USER_ID) Long userId`로 받는다.
+  - 응답의 시각은 `TimeFormat.iso(Instant)`로 만든다. 한국 시간 `+09:00`, 초 단위다. 예: `2026-11-15T14:20:00+09:00`
+  - 검증 메시지는 한국어 "~예요/~주세요" 말투로 쓴다. 예: "점수는 1~5예요.", "이름을 입력해 주세요."
+
+  [계약 문서 우선순위]
+  1. `docs/API명세서.md` v0.2: API 계약의 기준이다.
+  2. `docs/화면흐름.md`: Figma 화면 흐름 조사다. 명세에 없는 화면 기능은 여기서 확인한다.
+  3. `docs/기획안_디벨롭.docx`: 초기 기획이다. 명세와 다르면 명세를 따른다.
+
+  [실행과 검증]
+  - 테스트: `./gradlew test` (MockMvc 통합 테스트 `src/test/java/com/ganzithon/pulse/PulseFlowTest.java`)
+  - 로컬 실행: `./gradlew bootRun` (포트 8080)
+  - H2 콘솔: `/h2-console` (JDBC URL `jdbc:h2:mem:pulse`, 사용자 `sa`, 비밀번호 없음)
+  - 로컬과 테스트 DB는 H2 메모리 DB에 `create-drop`이라 엔티티를 바꿔도 마이그레이션 스크립트가 필요 없다. 재시작하면 데이터가 모두 지워진다.
+
+rules:
+  proposal:
+    - "Why에 이 변경이 docs/API명세서.md의 몇 장 몇 절에 대응하는지 적는다. 예: 6.3 다음 행동 기록"
+    - "'## 범위 밖' 절을 두고, 이번 변경에서 하지 않는 것과 그 이유를 적는다."
+  specs:
+    - "요구사항 제목(### Requirement: 뒤)은 한국어로 쓴다."
+    - "API 시나리오의 THEN에는 HTTP 상태 코드를 적고, 오류라면 오류 코드도 적는다. 예: 404 RECORD-001"
+  design:
+    - "추가하거나 바꾸는 클래스를 패키지 경로와 함께 나열한다. 예: service/UserService (추가)"
+  tasks:
+    - "구현 작업마다 그 동작을 확인하는 테스트 작성을 함께 넣고, 각 작업 그룹은 ./gradlew test 통과로 확인한다."
+    - "API 구현 상태가 바뀌면 README.md의 API 구현 현황 표를 갱신하는 작업을 넣는다."
+
+operations:
+  apply:
+    guidance:
+      - "구현을 시작하기 전에 docs/API명세서.md에서 이 변경이 대응하는 절을 다시 읽는다."
+      - "완료를 보고하기 전에 ./gradlew test를 실행해 통과를 확인한다."
+      - "git commit과 push는 사용자가 요청할 때만 한다."
